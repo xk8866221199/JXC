@@ -1,0 +1,617 @@
+<template>
+  <div class="suppliers">
+    <!-- 页面标题 -->
+    <div class="mb-4">
+      <h2 class="font-xl font-semibold m-0">供应商管理</h2>
+      <p class="text-secondary mt-1 mb-0">管理供应商信息，包括联系方式、合作状态等</p>
+    </div>
+
+    <!-- 搜索和操作区域 -->
+    <a-card class="mb-4" :bordered="false">
+      <a-row :gutter="16" class="mb-3">
+        <a-col :span="6">
+          <a-input-search
+            v-model:value="searchForm.keyword"
+            placeholder="搜索供应商名称或联系人"
+            enter-button="搜索"
+            @search="handleSearch"
+            allowClear
+          />
+        </a-col>
+        <a-col :span="4">
+          <a-select
+            v-model:value="searchForm.status"
+            placeholder="合作状态"
+            allowClear
+            style="width: 100%"
+          >
+            <a-select-option value="active">正常</a-select-option>
+            <a-select-option value="inactive">停用</a-select-option>
+          </a-select>
+        </a-col>
+        <a-col :span="4">
+          <a-select
+            v-model:value="searchForm.level"
+            placeholder="供应商等级"
+            allowClear
+            style="width: 100%"
+          >
+            <a-select-option value="A">A级</a-select-option>
+            <a-select-option value="B">B级</a-select-option>
+            <a-select-option value="C">C级</a-select-option>
+          </a-select>
+        </a-col>
+        <a-col :span="10" class="text-right">
+          <a-space>
+            <a-button @click="handleReset">重置</a-button>
+            <a-button type="primary" @click="handleSearch">
+              <SearchOutlined />
+              搜索
+            </a-button>
+            <a-button type="primary" @click="handleAdd">
+              <PlusOutlined />
+              新增供应商
+            </a-button>
+          </a-space>
+        </a-col>
+      </a-row>
+    </a-card>
+
+    <!-- 供应商表格 -->
+    <a-card :bordered="false">
+      <a-table
+        :columns="columns"
+        :data-source="supplierList"
+        :loading="loading"
+        :pagination="pagination"
+        row-key="id"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'name'">
+            <div class="d-flex align-center">
+              <a-avatar class="mr-2" :size="40" :src="record.avatar">
+                <template #icon><UserOutlined /></template>
+              </a-avatar>
+              <div>
+                <div class="font-medium">{{ record.name }}</div>
+                <div class="font-sm text-secondary">{{ record.code }}</div>
+              </div>
+            </div>
+          </template>
+
+          <template v-else-if="column.key === 'contact'">
+            <div>
+              <div class="font-medium">{{ record.contactPerson }}</div>
+              <div class="font-sm text-secondary">{{ record.contactPhone }}</div>
+            </div>
+          </template>
+
+          <template v-else-if="column.key === 'level'">
+            <a-tag :color="getLevelColor(record.level)"> {{ record.level }}级供应商 </a-tag>
+          </template>
+
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="record.status === 'active' ? 'success' : 'default'">
+              {{ record.status === 'active' ? '正常' : '停用' }}
+            </a-tag>
+          </template>
+
+          <template v-else-if="column.key === 'totalAmount'">
+            <span class="font-medium text-primary">¥{{ record.totalAmount.toFixed(2) }}</span>
+          </template>
+
+          <template v-else-if="column.key === 'action'">
+            <a-space>
+              <a-button type="link" size="small" @click="handleView(record)">
+                <EyeOutlined />
+                详情
+              </a-button>
+              <a-button type="link" size="small" @click="handleEdit(record)">
+                <EditOutlined />
+                编辑
+              </a-button>
+              <a-button type="link" size="small" @click="handleOrders(record)">
+                <FileTextOutlined />
+                采购记录
+              </a-button>
+              <a-popconfirm
+                title="确定要删除这个供应商吗？"
+                @confirm="handleDelete(record.id)"
+                ok-text="确定"
+                cancel-text="取消"
+              >
+                <a-button type="link" size="small" danger>
+                  <DeleteOutlined />
+                  删除
+                </a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
+
+    <!-- 新增/编辑供应商弹窗 -->
+    <a-modal
+      v-model:open="modalVisible"
+      :title="isEdit ? '编辑供应商' : '新增供应商'"
+      width="800px"
+      @ok="handleSave"
+      @cancel="handleCancel"
+      :confirmLoading="saveLoading"
+    >
+      <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical" class="mt-4">
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="供应商名称" name="name">
+              <a-input v-model:value="formData.name" placeholder="请输入供应商名称" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="供应商编码" name="code">
+              <a-input v-model:value="formData.code" placeholder="请输入供应商编码" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="联系人" name="contactPerson">
+              <a-input v-model:value="formData.contactPerson" placeholder="请输入联系人" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="联系电话" name="contactPhone">
+              <a-input v-model:value="formData.contactPhone" placeholder="请输入联系电话" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="电子邮箱" name="email">
+              <a-input v-model:value="formData.email" placeholder="请输入电子邮箱" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="供应商等级" name="level">
+              <a-select v-model:value="formData.level" placeholder="请选择供应商等级">
+                <a-select-option value="A">A级供应商</a-select-option>
+                <a-select-option value="B">B级供应商</a-select-option>
+                <a-select-option value="C">C级供应商</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="合作状态" name="status">
+              <a-select v-model:value="formData.status" placeholder="请选择合作状态">
+                <a-select-option value="active">正常</a-select-option>
+                <a-select-option value="inactive">停用</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="信用额度" name="creditLimit">
+              <a-input-number
+                v-model:value="formData.creditLimit"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+                placeholder="0.00"
+                addonAfter="元"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+
+        <a-form-item label="详细地址" name="address">
+          <a-textarea v-model:value="formData.address" :rows="2" placeholder="请输入详细地址" />
+        </a-form-item>
+
+        <a-form-item label="备注说明" name="remark">
+          <a-textarea v-model:value="formData.remark" :rows="3" placeholder="请输入备注说明" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 供应商详情弹窗 -->
+    <a-modal v-model:open="detailModalVisible" title="供应商详情" width="800px" :footer="null">
+      <div v-if="currentSupplier">
+        <a-descriptions title="基本信息" :column="2" bordered>
+          <a-descriptions-item label="供应商名称">{{ currentSupplier.name }}</a-descriptions-item>
+          <a-descriptions-item label="供应商编码">{{ currentSupplier.code }}</a-descriptions-item>
+          <a-descriptions-item label="联系人">{{
+            currentSupplier.contactPerson
+          }}</a-descriptions-item>
+          <a-descriptions-item label="联系电话">{{
+            currentSupplier.contactPhone
+          }}</a-descriptions-item>
+          <a-descriptions-item label="电子邮箱">{{ currentSupplier.email }}</a-descriptions-item>
+          <a-descriptions-item label="供应商等级">
+            <a-tag :color="getLevelColor(currentSupplier.level)">
+              {{ currentSupplier.level }}级供应商
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="合作状态">
+            <a-tag :color="currentSupplier.status === 'active' ? 'success' : 'default'">
+              {{ currentSupplier.status === 'active' ? '正常' : '停用' }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="信用额度"
+            >¥{{ currentSupplier.creditLimit.toFixed(2) }}</a-descriptions-item
+          >
+          <a-descriptions-item label="详细地址" :span="2">{{
+            currentSupplier.address
+          }}</a-descriptions-item>
+          <a-descriptions-item label="备注说明" :span="2">{{
+            currentSupplier.remark || '无'
+          }}</a-descriptions-item>
+        </a-descriptions>
+
+        <a-descriptions title="合作统计" :column="3" bordered class="mt-4">
+          <a-descriptions-item label="合作时长"
+            >{{ currentSupplier.cooperationDays }}天</a-descriptions-item
+          >
+          <a-descriptions-item label="采购订单数"
+            >{{ currentSupplier.orderCount }}单</a-descriptions-item
+          >
+          <a-descriptions-item label="累计采购额"
+            >¥{{ currentSupplier.totalAmount.toFixed(2) }}</a-descriptions-item
+          >
+        </a-descriptions>
+      </div>
+    </a-modal>
+  </div>
+</template>
+
+<script setup lang="ts">
+  import { ref, reactive, onMounted } from 'vue'
+  import { message } from 'ant-design-vue'
+  import {
+    SearchOutlined,
+    PlusOutlined,
+    EditOutlined,
+    EyeOutlined,
+    DeleteOutlined,
+    FileTextOutlined,
+    UserOutlined
+  } from '@ant-design/icons-vue'
+  import type { FormInstance } from 'ant-design-vue'
+
+  // 接口类型定义
+  interface Supplier {
+    id: number
+    name: string
+    code: string
+    contactPerson: string
+    contactPhone: string
+    email: string
+    level: 'A' | 'B' | 'C'
+    status: 'active' | 'inactive'
+    creditLimit: number
+    address: string
+    remark: string
+    totalAmount: number
+    orderCount: number
+    cooperationDays: number
+    avatar?: string
+    createTime: string
+  }
+
+  // 响应式数据
+  const loading = ref(false)
+  const saveLoading = ref(false)
+  const supplierList = ref<Supplier[]>([])
+  const modalVisible = ref(false)
+  const detailModalVisible = ref(false)
+  const isEdit = ref(false)
+  const formRef = ref<FormInstance>()
+  const currentSupplier = ref<Supplier | null>(null)
+
+  // 搜索表单
+  const searchForm = reactive({
+    keyword: '',
+    status: undefined,
+    level: undefined
+  })
+
+  // 分页配置
+  const pagination = reactive({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+    showSizeChanger: true,
+    showQuickJumper: true,
+    showTotal: (total: number) => `共 ${total} 条记录`
+  })
+
+  // 表格列配置
+  const columns = [
+    {
+      title: '供应商信息',
+      key: 'name',
+      width: 250
+    },
+    {
+      title: '联系方式',
+      key: 'contact',
+      width: 180
+    },
+    {
+      title: '电子邮箱',
+      dataIndex: 'email',
+      key: 'email',
+      width: 200
+    },
+    {
+      title: '等级',
+      key: 'level',
+      width: 120,
+      align: 'center'
+    },
+    {
+      title: '状态',
+      key: 'status',
+      width: 100,
+      align: 'center'
+    },
+    {
+      title: '累计采购额',
+      key: 'totalAmount',
+      width: 150,
+      align: 'right'
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createTime',
+      key: 'createTime',
+      width: 180
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 280,
+      align: 'center',
+      fixed: 'right'
+    }
+  ]
+
+  // 表单数据
+  const formData = reactive({
+    id: undefined,
+    name: '',
+    code: '',
+    contactPerson: '',
+    contactPhone: '',
+    email: '',
+    level: 'B',
+    status: 'active',
+    creditLimit: 0,
+    address: '',
+    remark: ''
+  })
+
+  // 表单验证规则
+  const formRules = {
+    name: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }],
+    code: [{ required: true, message: '请输入供应商编码', trigger: 'blur' }],
+    contactPerson: [{ required: true, message: '请输入联系人', trigger: 'blur' }],
+    contactPhone: [
+      { required: true, message: '请输入联系电话', trigger: 'blur' },
+      { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+    ],
+    email: [
+      { required: true, message: '请输入电子邮箱', trigger: 'blur' },
+      { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+    ],
+    level: [{ required: true, message: '请选择供应商等级', trigger: 'change' }],
+    status: [{ required: true, message: '请选择合作状态', trigger: 'change' }]
+  }
+
+  // 获取等级颜色
+  const getLevelColor = (level: string) => {
+    const colors = {
+      A: 'success',
+      B: 'warning',
+      C: 'default'
+    }
+    return colors[level] || 'default'
+  }
+
+  // 加载供应商列表
+  const loadSupplierList = async () => {
+    loading.value = true
+    try {
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const mockData = [
+        {
+          id: 1,
+          name: '苹果供应商有限公司',
+          code: 'SUP001',
+          contactPerson: '张经理',
+          contactPhone: '13800138001',
+          email: 'zhang@apple-supplier.com',
+          level: 'A',
+          status: 'active',
+          creditLimit: 1000000.0,
+          address: '北京市朝阳区苹果大厦8楼',
+          remark: '主要供应苹果产品',
+          totalAmount: 2580000.0,
+          orderCount: 25,
+          cooperationDays: 365,
+          avatar: '/api/placeholder/40/40',
+          createTime: '2024-01-10 09:00:00'
+        },
+        {
+          id: 2,
+          name: '华为供应商集团',
+          code: 'SUP002',
+          contactPerson: '李经理',
+          contactPhone: '13800138002',
+          email: 'li@huawei-supplier.com',
+          level: 'A',
+          status: 'active',
+          creditLimit: 800000.0,
+          address: '深圳市南山区华为科技园',
+          remark: '华为产品独家供应商',
+          totalAmount: 1950000.0,
+          orderCount: 18,
+          cooperationDays: 280,
+          avatar: '/api/placeholder/40/40',
+          createTime: '2024-01-12 10:30:00'
+        },
+        {
+          id: 3,
+          name: '小米供应链公司',
+          code: 'SUP003',
+          contactPerson: '王经理',
+          contactPhone: '13800138003',
+          email: 'wang@xiaomi-supplier.com',
+          level: 'B',
+          status: 'active',
+          creditLimit: 500000.0,
+          address: '北京市海淀区小米科技园',
+          remark: '小米生态链产品供应',
+          totalAmount: 1200000.0,
+          orderCount: 15,
+          cooperationDays: 180,
+          avatar: '/api/placeholder/40/40',
+          createTime: '2024-01-15 14:20:00'
+        }
+      ]
+
+      supplierList.value = mockData
+      pagination.total = mockData.length
+    } catch (error) {
+      message.error('加载供应商列表失败')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 搜索
+  const handleSearch = () => {
+    pagination.current = 1
+    loadSupplierList()
+  }
+
+  // 重置搜索
+  const handleReset = () => {
+    Object.assign(searchForm, {
+      keyword: '',
+      status: undefined,
+      level: undefined
+    })
+    handleSearch()
+  }
+
+  // 表格变化处理
+  const handleTableChange = (pag: any) => {
+    pagination.current = pag.current
+    pagination.pageSize = pag.pageSize
+    loadSupplierList()
+  }
+
+  // 新增
+  const handleAdd = () => {
+    isEdit.value = false
+    modalVisible.value = true
+    resetForm()
+  }
+
+  // 编辑
+  const handleEdit = (record: Supplier) => {
+    isEdit.value = true
+    modalVisible.value = true
+    Object.assign(formData, record)
+  }
+
+  // 查看详情
+  const handleView = (record: Supplier) => {
+    currentSupplier.value = record
+    detailModalVisible.value = true
+  }
+
+  // 采购记录
+  const handleOrders = (record: Supplier) => {
+    message.info('采购记录功能开发中')
+  }
+
+  // 删除
+  const handleDelete = async (id: number) => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      message.success('删除成功')
+      loadSupplierList()
+    } catch (error) {
+      message.error('删除失败')
+    }
+  }
+
+  // 保存
+  const handleSave = async () => {
+    try {
+      await formRef.value?.validate()
+      saveLoading.value = true
+
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      message.success(isEdit.value ? '更新成功' : '添加成功')
+      modalVisible.value = false
+      loadSupplierList()
+    } catch (error) {
+      console.log('表单验证失败:', error)
+    } finally {
+      saveLoading.value = false
+    }
+  }
+
+  // 取消
+  const handleCancel = () => {
+    modalVisible.value = false
+    resetForm()
+  }
+
+  // 重置表单
+  const resetForm = () => {
+    Object.assign(formData, {
+      id: undefined,
+      name: '',
+      code: '',
+      contactPerson: '',
+      contactPhone: '',
+      email: '',
+      level: 'B',
+      status: 'active',
+      creditLimit: 0,
+      address: '',
+      remark: ''
+    })
+    formRef.value?.resetFields()
+  }
+
+  // 组件挂载
+  onMounted(() => {
+    loadSupplierList()
+  })
+</script>
+
+<style scoped>
+  .suppliers {
+    padding: 0;
+  }
+
+  :deep(.ant-table-cell) {
+    padding: 12px 8px;
+  }
+
+  :deep(.ant-descriptions-item-label) {
+    font-weight: 600;
+  }
+</style>

@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi, beforeEach } from 'vitest'
 import { config } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ECharts from 'vue-echarts'
@@ -40,20 +40,24 @@ beforeEach(() => {
 })
 
 // Mock localStorage
-const localStorageMock = {
+const localStorageMock: Storage = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),
-  clear: vi.fn()
+  clear: vi.fn(),
+  length: 0,
+  key: vi.fn().mockReturnValue(null)
 }
 global.localStorage = localStorageMock
 
 // Mock sessionStorage
-const sessionStorageMock = {
+const sessionStorageMock: Storage = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),
-  clear: vi.fn()
+  clear: vi.fn(),
+  length: 0,
+  key: vi.fn().mockReturnValue(null)
 }
 global.sessionStorage = sessionStorageMock
 

@@ -229,6 +229,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import { useUserStore } from '@/stores/user'
   import { message } from 'ant-design-vue'
+  import { logoutApi } from '@/api/auth'
   import {
     DashboardOutlined,
     SettingOutlined,
@@ -400,11 +401,19 @@
     switch (key) {
       case 'logout':
         try {
+          // 调用后端登出API
+          await logoutApi()
+          // 清除本地存储
           userStore.logout()
+          localStorage.removeItem('token')
           message.success('已退出登录')
           router.push('/login')
         } catch (error) {
-          message.error('退出登录失败')
+          // 即使后端调用失败，也要清除本地存储
+          userStore.logout()
+          localStorage.removeItem('token')
+          message.success('已退出登录')
+          router.push('/login')
         }
         break
       case 'profile':

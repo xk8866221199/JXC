@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 
 // 用户信息接口
 interface UserInfo {
-  id?: string
+  id?: string | number
   username?: string
   name?: string
   email?: string

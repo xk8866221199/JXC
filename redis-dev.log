@@ -1,0 +1,9 @@
+38356:C 24 Sep 2025 20:29:10.363 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+38356:C 24 Sep 2025 20:29:10.363 * Redis version=8.0.2, bits=64, commit=00000000, modified=1, pid=38356, just started
+38356:C 24 Sep 2025 20:29:10.364 * Configuration loaded
+38356:M 24 Sep 2025 20:29:10.364 * monotonic clock: POSIX clock_gettime
+38356:M 24 Sep 2025 20:29:10.364 # Failed to write PID file: Permission denied
+38356:M 24 Sep 2025 20:29:10.365 * Running mode=standalone, port=6379.
+38356:M 24 Sep 2025 20:29:10.365 # WARNING: The TCP backlog setting of 511 cannot be enforced because kern.ipc.somaxconn is set to the lower value of 128.
+38356:M 24 Sep 2025 20:29:10.365 # Warning: Could not create server TCP listening socket 127.0.0.1:6379: bind: Address already in use
+38356:M 24 Sep 2025 20:29:10.365 # Failed listening on port 6379 (tcp), aborting.

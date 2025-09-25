@@ -129,14 +129,104 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     steps:
+    - name: Check deployment secrets
+      id: check-deploy-secrets
+      run: |
+        if [ -z "${{ secrets.HOST }}" ] || [ -z "${{ secrets.USERNAME }}" ] || [ -z "${{ secrets.SSH_KEY }}" ]; then
+          echo "❌ Required deployment secrets are missing"
+          echo "Please configure the following secrets in your GitHub repository:"
+          echo "  - HOST: Your server IP address or domain"
+          echo "  - USERNAME: Your server username"
+          echo "  - SSH_KEY: Your SSH private key"
+          echo "skipping_deployment=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        echo "✅ All deployment secrets are configured"
+        echo "skipping_deployment=false" >> $GITHUB_OUTPUT
+    
     - name: Deploy to production
+      if: steps.check-deploy-secrets.outputs.skipping_deployment == 'false'
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.SSH_PORT || '22' }}
+        timeout: 300s
         script: |
+          echo "🚀 Starting deployment..."
+          
+          # 检查目录是否存在
+          if [ ! -d "/opt/jxc-frontend" ]; then
+            echo "📁 Creating deployment directory..."
+            sudo mkdir -p /opt/jxc-frontend
+            sudo chown $USER:$USER /opt/jxc-frontend
+          fi
+          
           cd /opt/jxc-frontend
-          docker-compose pull jxc-frontend
-          docker-compose up -d jxc-frontend
+          
+          # 拉取最新镜像
+          echo "📦 Pulling latest Docker image..."
+          docker-compose pull jxc-frontend || {
+            echo "❌ Failed to pull Docker image"
+            exit 1
+          }
+          
+          # 启动服务
+          echo "🚀 Starting services..."
+          docker-compose up -d jxc-frontend || {
+            echo "❌ Failed to start services"
+            exit 1
+          }
+          
+          # 等待服务启动
+          echo "⏳ Waiting for service to start..."
+          sleep 10
+          
+          # 健康检查
+          if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️  Health check failed, but service may still be starting"
+          fi
+          
+          # 清理旧镜像
+          echo "🧹 Cleaning up old images..."
           docker system prune -f
+          
+          echo "🎉 Deployment completed successfully!"
+
+    # 本地部署（当secrets未配置时的备选方案）
+  local-deploy:
+    runs-on: ubuntu-latest
+    needs: [docker]
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Check if deployment secrets are configured
+      id: check-secrets
+      run: |
+        if [ -n "${{ secrets.HOST }}" ]; then
+          echo "secrets_configured=true" >> $GITHUB_OUTPUT
+        else
+          echo "secrets_configured=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Local deployment notice
+      if: steps.check-secrets.outputs.secrets_configured == 'false'
+      run: |
+        echo "📝 Deployment Secrets Not Configured"
+        echo "======================================"
+        echo "To enable automatic deployment, please configure the following secrets:"
+        echo ""
+        echo "1. Go to your repository Settings > Secrets and Variables > Actions"
+        echo "2. Add the following repository secrets:"
+        echo "   - HOST: Your server IP address or domain name"
+        echo "   - USERNAME: Your server username (e.g., ubuntu, root)"
+        echo "   - SSH_KEY: Your SSH private key content"
+        echo "   - SSH_PORT: SSH port (optional, defaults to 22)"
+        echo ""
+        echo "3. For manual deployment, you can:"
+        echo "   - Download the Docker image: docker pull ${{ secrets.DOCKER_USERNAME }}/jxc-frontend:latest"
+        echo "   - Or run the deployment script locally: ./deploy.sh"
+        echo ""
+        echo "Docker image built successfully: ${{ secrets.DOCKER_USERNAME }}/jxc-frontend:latest"

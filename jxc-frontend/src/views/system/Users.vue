@@ -20,28 +20,16 @@
         </a-col>
         <a-col :span="4">
           <a-select
-            v-model:value="searchForm.roleId"
-            placeholder="选择角色"
-            allowClear
-            style="width: 100%"
-          >
-            <a-select-option v-for="role in roles" :key="role.id" :value="role.id">
-              {{ role.name }}
-            </a-select-option>
-          </a-select>
-        </a-col>
-        <a-col :span="4">
-          <a-select
             v-model:value="searchForm.status"
             placeholder="用户状态"
             allowClear
             style="width: 100%"
           >
-            <a-select-option value="active">正常</a-select-option>
-            <a-select-option value="disabled">禁用</a-select-option>
+            <a-select-option :value="1">正常</a-select-option>
+            <a-select-option :value="0">禁用</a-select-option>
           </a-select>
         </a-col>
-        <a-col :span="10" class="text-right">
+        <a-col :span="14" class="text-right">
           <a-space>
             <a-button @click="handleReset">重置</a-button>
             <a-button type="primary" @click="handleSearch">
@@ -80,17 +68,9 @@
             </div>
           </template>
 
-          <template v-else-if="column.key === 'roles'">
-            <a-space>
-              <a-tag v-for="role in record.roles" :key="role.id" :color="getRoleColor(role.code)">
-                {{ role.name }}
-              </a-tag>
-            </a-space>
-          </template>
-
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === 'active' ? 'success' : 'error'">
-              {{ record.status === 'active' ? '正常' : '禁用' }}
+            <a-tag :color="record.status === 1 ? 'success' : 'error'">
+              {{ record.status === 1 ? '正常' : '禁用' }}
             </a-tag>
           </template>
 
@@ -108,11 +88,11 @@
                 type="link"
                 size="small"
                 @click="handleToggleStatus(record)"
-                :class="record.status === 'active' ? 'text-warning' : 'text-success'"
+                :class="record.status === 1 ? 'text-warning' : 'text-success'"
               >
-                <StopOutlined v-if="record.status === 'active'" />
+                <StopOutlined v-if="record.status === 1" />
                 <PlayCircleOutlined v-else />
-                {{ record.status === 'active' ? '禁用' : '启用' }}
+                {{ record.status === 1 ? '禁用' : '启用' }}
               </a-button>
               <a-popconfirm
                 title="确定要删除这个用户吗？"
@@ -186,31 +166,32 @@
 
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="用户角色" name="roleIds">
-              <a-select
-                v-model:value="formData.roleIds"
-                mode="multiple"
-                placeholder="请选择用户角色"
-                style="width: 100%"
-              >
-                <a-select-option v-for="role in roles" :key="role.id" :value="role.id">
-                  {{ role.name }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
             <a-form-item label="用户状态" name="status">
               <a-select v-model:value="formData.status" placeholder="请选择用户状态">
-                <a-select-option value="active">正常</a-select-option>
-                <a-select-option value="disabled">禁用</a-select-option>
+                <a-select-option :value="1">正常</a-select-option>
+                <a-select-option :value="0">禁用</a-select-option>
               </a-select>
             </a-form-item>
           </a-col>
         </a-row>
+      </a-form>
+    </a-modal>
 
-        <a-form-item label="备注说明" name="remark">
-          <a-textarea v-model:value="formData.remark" :rows="3" placeholder="请输入备注说明" />
+    <!-- 重置密码弹窗 -->
+    <a-modal
+      v-model:open="resetPasswordVisible"
+      title="重置密码"
+      width="400px"
+      @ok="handleResetPasswordConfirm"
+      @cancel="handleResetPasswordCancel"
+      :confirmLoading="resetPasswordLoading"
+    >
+      <a-form ref="resetPasswordFormRef" :model="resetPasswordForm" :rules="resetPasswordRules" layout="vertical" class="mt-4">
+        <a-form-item label="新密码" name="newPassword">
+          <a-input-password v-model:value="resetPasswordForm.newPassword" placeholder="请输入新密码" />
+        </a-form-item>
+        <a-form-item label="确认密码" name="confirmPassword">
+          <a-input-password v-model:value="resetPasswordForm.confirmPassword" placeholder="请确认新密码" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -231,6 +212,14 @@
     UserOutlined
   } from '@ant-design/icons-vue'
   import type { FormInstance } from 'ant-design-vue'
+  import {
+    getUsersApi,
+    createUserApi,
+    updateUserApi,
+    deleteUserApi,
+    resetUserPasswordApi,
+    updateUserStatusApi
+  } from '@/api/user'
 
   // 接口类型定义
   interface User {
@@ -239,33 +228,26 @@
     realName: string
     phone: string
     email: string
-    status: 'active' | 'disabled'
-    roles: Role[]
-    remark: string
+    status: number
     avatar?: string
-    lastLoginTime: string
     createTime: string
-  }
-
-  interface Role {
-    id: number
-    name: string
-    code: string
+    updateTime: string
   }
 
   // 响应式数据
   const loading = ref(false)
   const saveLoading = ref(false)
+  const resetPasswordLoading = ref(false)
   const userList = ref<User[]>([])
-  const roles = ref<Role[]>([])
   const modalVisible = ref(false)
+  const resetPasswordVisible = ref(false)
   const isEdit = ref(false)
   const formRef = ref<FormInstance>()
+  const resetPasswordFormRef = ref<FormInstance>()
 
   // 搜索表单
   const searchForm = reactive({
     keyword: '',
-    roleId: undefined,
     status: undefined
   })
 
@@ -299,21 +281,10 @@
       width: 200
     },
     {
-      title: '角色',
-      key: 'roles',
-      width: 200
-    },
-    {
       title: '状态',
       key: 'status',
       width: 100,
       align: 'center'
-    },
-    {
-      title: '最后登录',
-      dataIndex: 'lastLoginTime',
-      key: 'lastLoginTime',
-      width: 160
     },
     {
       title: '创建时间',
@@ -339,9 +310,14 @@
     confirmPassword: '',
     phone: '',
     email: '',
-    roleIds: [],
-    status: 'active',
-    remark: ''
+    status: 1
+  })
+
+  // 重置密码表单数据
+  const resetPasswordForm = reactive({
+    userId: undefined,
+    newPassword: '',
+    confirmPassword: ''
   })
 
   // 表单验证规则
@@ -371,78 +347,48 @@
       { required: true, message: '请输入电子邮箱', trigger: 'blur' },
       { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
     ],
-    roleIds: [{ required: true, message: '请选择用户角色', trigger: 'change' }],
     status: [{ required: true, message: '请选择用户状态', trigger: 'change' }]
   }
 
-  // 获取角色颜色
-  const getRoleColor = (code: string) => {
-    const colors = {
-      admin: 'red',
-      manager: 'orange',
-      employee: 'blue',
-      guest: 'default'
-    }
-    return colors[code] || 'default'
+  // 重置密码表单验证规则
+  const resetPasswordRules = {
+    newPassword: [
+      { required: true, message: '请输入新密码', trigger: 'blur' },
+      { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    ],
+    confirmPassword: [
+      { required: true, message: '请确认新密码', trigger: 'blur' },
+      {
+        validator: (rule: any, value: string) => {
+          if (value !== resetPasswordForm.newPassword) {
+            return Promise.reject('两次输入密码不一致')
+          }
+          return Promise.resolve()
+        },
+        trigger: 'blur'
+      }
+    ]
   }
 
   // 加载用户列表
   const loadUserList = async () => {
     loading.value = true
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const params = {
+        page: pagination.current,
+        size: pagination.pageSize,
+        keyword: searchForm.keyword || undefined,
+        status: searchForm.status
+      }
 
-      const mockData = [
-        {
-          id: 1,
-          username: 'admin',
-          realName: '系统管理员',
-          phone: '13800138001',
-          email: 'admin@jxc.com',
-          status: 'active',
-          roles: [{ id: 1, name: '超级管理员', code: 'admin' }],
-          remark: '系统超级管理员',
-          avatar: '/api/placeholder/40/40',
-          lastLoginTime: '2024-01-24 09:30:00',
-          createTime: '2024-01-01 00:00:00'
-        },
-        {
-          id: 2,
-          username: 'manager',
-          realName: '店长',
-          phone: '13800138002',
-          email: 'manager@jxc.com',
-          status: 'active',
-          roles: [{ id: 2, name: '店长', code: 'manager' }],
-          remark: '门店管理员',
-          avatar: '/api/placeholder/40/40',
-          lastLoginTime: '2024-01-24 08:45:00',
-          createTime: '2024-01-05 10:00:00'
-        }
-      ]
-
-      userList.value = mockData
-      pagination.total = mockData.length
-    } catch (error) {
-      message.error('加载用户列表失败')
+      const response = await getUsersApi(params)
+      
+      userList.value = response.records
+      pagination.total = response.total
+    } catch (error: any) {
+      message.error('加载用户列表失败: ' + (error.message || '未知错误'))
     } finally {
       loading.value = false
-    }
-  }
-
-  // 加载角色列表
-  const loadRoles = async () => {
-    try {
-      const mockRoles = [
-        { id: 1, name: '超级管理员', code: 'admin' },
-        { id: 2, name: '店长', code: 'manager' },
-        { id: 3, name: '员工', code: 'employee' },
-        { id: 4, name: '访客', code: 'guest' }
-      ]
-      roles.value = mockRoles
-    } catch (error) {
-      message.error('加载角色列表失败')
     }
   }
 
@@ -456,7 +402,6 @@
   const handleReset = () => {
     Object.assign(searchForm, {
       keyword: '',
-      roleId: undefined,
       status: undefined
     })
     handleSearch()
@@ -481,41 +426,65 @@
     isEdit.value = true
     modalVisible.value = true
     Object.assign(formData, {
-      ...record,
-      roleIds: record.roles.map(role => role.id)
+      ...record
     })
   }
 
   // 重置密码
-  const handleResetPassword = async (record: User) => {
+  const handleResetPassword = (record: User) => {
+    resetPasswordForm.userId = record.id
+    resetPasswordForm.newPassword = ''
+    resetPasswordForm.confirmPassword = ''
+    resetPasswordVisible.value = true
+  }
+
+  // 确认重置密码
+  const handleResetPasswordConfirm = async () => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      message.success(`已重置用户 ${record.realName} 的密码`)
-    } catch (error) {
-      message.error('重置密码失败')
+      await resetPasswordFormRef.value?.validate()
+      resetPasswordLoading.value = true
+
+      await resetUserPasswordApi(resetPasswordForm.userId!, {
+        newPassword: resetPasswordForm.newPassword
+      })
+
+      message.success('密码重置成功')
+      resetPasswordVisible.value = false
+    } catch (error: any) {
+      message.error('重置密码失败: ' + (error.message || '未知错误'))
+    } finally {
+      resetPasswordLoading.value = false
     }
+  }
+
+  // 取消重置密码
+  const handleResetPasswordCancel = () => {
+    resetPasswordVisible.value = false
+    resetPasswordFormRef.value?.resetFields()
   }
 
   // 切换状态
   const handleToggleStatus = async (record: User) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      const action = record.status === 'active' ? '禁用' : '启用'
+      const newStatus = record.status === 1 ? 0 : 1
+      await updateUserStatusApi(record.id, { status: newStatus })
+      
+      const action = newStatus === 1 ? '启用' : '禁用'
       message.success(`已${action}用户 ${record.realName}`)
       loadUserList()
-    } catch (error) {
-      message.error('操作失败')
+    } catch (error: any) {
+      message.error('操作失败: ' + (error.message || '未知错误'))
     }
   }
 
   // 删除
   const handleDelete = async (id: number) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await deleteUserApi(id)
       message.success('删除成功')
       loadUserList()
-    } catch (error) {
-      message.error('删除失败')
+    } catch (error: any) {
+      message.error('删除失败: ' + (error.message || '未知错误'))
     }
   }
 
@@ -525,13 +494,21 @@
       await formRef.value?.validate()
       saveLoading.value = true
 
-      await new Promise(resolve => setTimeout(resolve, 800))
+      const userData = { ...formData }
+      delete userData.confirmPassword
 
-      message.success(isEdit.value ? '更新成功' : '添加成功')
+      if (isEdit.value) {
+        await updateUserApi(formData.id!, userData)
+        message.success('更新成功')
+      } else {
+        await createUserApi(userData)
+        message.success('添加成功')
+      }
+
       modalVisible.value = false
       loadUserList()
-    } catch (error) {
-      console.log('表单验证失败:', error)
+    } catch (error: any) {
+      message.error('保存失败: ' + (error.message || '未知错误'))
     } finally {
       saveLoading.value = false
     }
@@ -553,16 +530,13 @@
       confirmPassword: '',
       phone: '',
       email: '',
-      roleIds: [],
-      status: 'active',
-      remark: ''
+      status: 1
     })
     formRef.value?.resetFields()
   }
 
   // 组件挂载
   onMounted(() => {
-    loadRoles()
     loadUserList()
   })
 </script>

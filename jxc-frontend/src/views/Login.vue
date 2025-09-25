@@ -119,6 +119,7 @@
   import { useRouter } from 'vue-router'
   import { message } from 'ant-design-vue'
   import { useUserStore } from '@/stores/user'
+  import { loginApi } from '@/api/auth'
   import {
     UserOutlined,
     LockOutlined,
@@ -218,21 +219,27 @@
 
       loginLoading.value = true
 
-      // 模拟登录请求
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
-      // 模拟登录成功
-      const userInfo = {
-        id: 1,
-        name: '管理员',
+      // 调用真实的登录API
+      const response = await loginApi({
         username: loginForm.username,
-        roles: ['admin']
-      }
+        password: loginForm.password,
+        captcha: loginForm.captcha,
+        rememberMe: rememberMe.value
+      })
 
       // 保存用户信息
-      userStore.setToken('mock-jwt-token-' + Date.now())
-      userStore.setUserInfo(userInfo)
-      userStore.setRoles(userInfo.roles)
+      userStore.setToken(response.token)
+      userStore.setUserInfo({
+        id: response.userId,
+        username: response.username,
+        name: response.realName,
+        avatar: response.avatar
+      })
+      userStore.setRoles(response.roles || [])
+      userStore.setPermissions(response.permissions || [])
+
+      // 保存token到localStorage
+      localStorage.setItem('token', response.token)
 
       // 记住登录
       if (rememberMe.value) {

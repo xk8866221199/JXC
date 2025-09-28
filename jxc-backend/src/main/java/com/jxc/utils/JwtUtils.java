@@ -22,10 +22,10 @@ public class JwtUtils {
     
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
     
-    @Value("${app.jwt.secret:jxcSecretKeyForJwtTokenGenerationThatShouldBeAtLeast256BitsLong}")
+    @Value("${jwt.secret:jxcSecretKeyForJwtTokenGenerationThatShouldBeAtLeast256BitsLong}")
     private String jwtSecret;
     
-    @Value("${app.jwt.expiration:86400000}") // 24小时
+    @Value("${jwt.expiration:86400000}") // 24小时
     private long jwtExpirationMs;
     
     /**

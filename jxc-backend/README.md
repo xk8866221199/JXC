@@ -242,23 +242,6 @@ mvn test jacoco:report
 
 ## 🚀 部署
 
-### Docker部署
-
-```bash
-# 构建镜像
-docker build -t jxc-backend:1.0.0 .
-
-# 运行容器
-docker run -d \
-  --name jxc-backend \
-  -p 8080:8080 \
-  -e DB_HOST=your_db_host \
-  -e DB_USERNAME=your_username \
-  -e DB_PASSWORD=your_password \
-  -e REDIS_HOST=your_redis_host \
-  jxc-backend:1.0.0
-```
-
 ### 生产环境
 
 1. 修改配置文件中的数据库和Redis连接信息

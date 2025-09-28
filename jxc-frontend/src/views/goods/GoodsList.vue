@@ -223,6 +223,15 @@
     DeleteOutlined
   } from '@ant-design/icons-vue'
   import type { FormInstance } from 'ant-design-vue'
+  import {
+    getGoodsListApi,
+    createGoodsApi,
+    updateGoodsApi,
+    deleteGoodsApi,
+    updateGoodsStatusApi,
+    getGoodsByIdApi
+  } from '@/api/goodsInfo'
+  import { getAllGoodsCategoriesApi } from '@/api/goodsCategory'
 
   // 接口类型定义
   interface GoodsItem {
@@ -364,31 +373,31 @@
   const loadGoodsList = async () => {
     loading.value = true
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500))
+      const params = {
+        page: pagination.current,
+        size: pagination.pageSize,
+        keyword: searchForm.keyword || undefined,
+        categoryId: searchForm.categoryId,
+        status: searchForm.status === 'active' ? 1 : (searchForm.status === 'inactive' ? 0 : undefined)
+      }
 
-      const mockData: GoodsItem[] = [
-        {
-          id: 1,
-          name: '苹果iPhone 15',
-          code: 'IP15001',
-          categoryId: 1,
-          categoryName: '电子产品',
-          price: 5999.0,
-          costPrice: 4500.0,
-          stock: 25,
-          minStock: 10,
-          status: 'active' as 'active',
-          description: '最新款iPhone 15手机',
-          image: '/api/placeholder/60/60',
-          createTime: '2024-01-15 10:30:00'
-        }
-      ]
-
-      goodsList.value = mockData
-      pagination.total = 1
-    } catch (error) {
-      message.error('加载商品列表失败')
+      const response = await getGoodsListApi(params)
+      
+      const goods = response.data?.records || response.records || []
+      goodsList.value = goods.map((item: any) => ({
+        ...item,
+        status: item.status === 1 ? 'active' : 'inactive',
+        categoryName: item.categoryName || '',
+        price: item.salePrice || 0,
+        costPrice: item.purchasePrice || 0,
+        stock: item.stockQuantity || 0,
+        minStock: item.minStock || 0,
+        createTime: item.createdAt || item.createTime
+      }))
+      
+      pagination.total = response.data?.total || response.total || 0
+    } catch (error: any) {
+      message.error('加载商品列表失败: ' + (error.message || '未知错误'))
     } finally {
       loading.value = false
     }
@@ -397,14 +406,14 @@
   // 加载分类列表
   const loadCategories = async () => {
     try {
-      const mockCategories = [
-        { id: 1, name: '电子产品' },
-        { id: 2, name: '服装鞋帽' },
-        { id: 3, name: '食品饮料' }
-      ]
-      categories.value = mockCategories
-    } catch (error) {
-      message.error('加载分类列表失败')
+      const response = await getAllGoodsCategoriesApi()
+      const categories = response.data?.records || response.records || []
+      categories.value = categories.map((item: any) => ({
+        id: item.id,
+        name: item.categoryName || item.name
+      }))
+    } catch (error: any) {
+      message.error('加载分类列表失败: ' + (error.message || '未知错误'))
     }
   }
 
@@ -453,11 +462,11 @@
   // 删除
   const handleDelete = async (id: number) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await deleteGoodsApi(id)
       message.success('删除成功')
       loadGoodsList()
-    } catch (error) {
-      message.error('删除失败')
+    } catch (error: any) {
+      message.error('删除失败: ' + (error.message || '未知错误'))
     }
   }
 
@@ -467,13 +476,35 @@
       await formRef.value?.validate()
       saveLoading.value = true
 
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // 转换数据格式
+      const submitData = {
+        ...formData,
+        status: formData.status === 'active' ? 1 : 0,
+        salePrice: formData.price,
+        purchasePrice: formData.costPrice,
+        stockQuantity: formData.minStock
+      }
+      // 移除前端使用的字段
+      delete submitData.price
+      delete submitData.costPrice
+      delete submitData.minStock
 
-      message.success(isEdit.value ? '更新成功' : '添加成功')
+      if (isEdit.value) {
+        await updateGoodsApi(formData.id!, submitData)
+        message.success('更新成功')
+      } else {
+        await createGoodsApi(submitData)
+        message.success('添加成功')
+      }
+
       modalVisible.value = false
       loadGoodsList()
-    } catch (error) {
-      console.log('表单验证失败:', error)
+    } catch (error: any) {
+      if (error.message?.includes('商品编码已存在')) {
+        message.error('商品编码已存在，请更换其他编码')
+      } else {
+        message.error('保存失败: ' + (error.message || '未知错误'))
+      }
     } finally {
       saveLoading.value = false
     }

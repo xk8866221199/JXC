@@ -52,11 +52,11 @@ public class SysUser {
     @Schema(description = "状态：0-禁用，1-启用")
     private Integer status;
     
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     @Schema(description = "创建时间")
     private LocalDateTime createTime;
     
-    @TableField(value = "updated_time", fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     @Schema(description = "更新时间")
     private LocalDateTime updateTime;
     
@@ -67,7 +67,8 @@ public class SysUser {
     
     // 非数据库字段，用于接收角色ID列表
     @TableField(exist = false)
-    private String roleIds;
+    @Schema(description = "角色ID列表")
+    private Long[] roleIds;
     
     // 构造函数
     public SysUser() {}
@@ -160,11 +161,11 @@ public class SysUser {
         this.deleted = deleted;
     }
     
-    public String getRoleIds() {
+    public Long[] getRoleIds() {
         return roleIds;
     }
     
-    public void setRoleIds(String roleIds) {
+    public void setRoleIds(Long[] roleIds) {
         this.roleIds = roleIds;
     }
     

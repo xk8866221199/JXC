@@ -77,7 +77,7 @@ public class UserController {
     @PostMapping
     public Result<String> createUser(@RequestBody SysUser user) {
         try {
-            boolean success = userService.createUser(user, null);
+            boolean success = userService.createUser(user, user.getRoleIds());
             if (success) {
                 return Result.success("创建成功");
             } else {
@@ -97,7 +97,7 @@ public class UserController {
     public Result<String> updateUser(@PathVariable Long id, @RequestBody SysUser user) {
         try {
             user.setId(id);
-            boolean success = userService.updateUser(user, null);
+            boolean success = userService.updateUser(user, user.getRoleIds());
             if (success) {
                 return Result.success("更新成功");
             } else {

@@ -119,6 +119,7 @@
       @ok="handleSave"
       @cancel="handleCancel"
       :confirmLoading="saveLoading"
+      :maskClosable="false"
     >
       <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical" class="mt-4">
         <a-row :gutter="16">
@@ -173,6 +174,16 @@
               </a-select>
             </a-form-item>
           </a-col>
+          <a-col :span="12">
+            <a-form-item label="用户角色" name="roleIds">
+              <a-select
+                v-model:value="formData.roleIds"
+                mode="multiple"
+                placeholder="请选择用户角色"
+                :options="roleList.map(role => ({ value: role.id, label: role.roleName }))"
+              />
+            </a-form-item>
+          </a-col>
         </a-row>
       </a-form>
     </a-modal>
@@ -185,6 +196,7 @@
       @ok="handleResetPasswordConfirm"
       @cancel="handleResetPasswordCancel"
       :confirmLoading="resetPasswordLoading"
+      :maskClosable="false"
     >
       <a-form ref="resetPasswordFormRef" :model="resetPasswordForm" :rules="resetPasswordRules" layout="vertical" class="mt-4">
         <a-form-item label="新密码" name="newPassword">
@@ -214,12 +226,14 @@
   import type { FormInstance } from 'ant-design-vue'
   import {
     getUsersApi,
+    getUserByIdApi,
     createUserApi,
     updateUserApi,
     deleteUserApi,
     resetUserPasswordApi,
     updateUserStatusApi
   } from '@/api/user'
+  import { getAllRolesApi } from '@/api/role'
 
   // 接口类型定义
   interface User {
@@ -232,6 +246,14 @@
     avatar?: string
     createTime: string
     updateTime: string
+    roleIds?: number[]
+  }
+
+  interface Role {
+    id: number
+    roleName: string
+    roleCode: string
+    status: number
   }
 
   // 响应式数据
@@ -239,6 +261,7 @@
   const saveLoading = ref(false)
   const resetPasswordLoading = ref(false)
   const userList = ref<User[]>([])
+  const roleList = ref<Role[]>([])
   const modalVisible = ref(false)
   const resetPasswordVisible = ref(false)
   const isEdit = ref(false)
@@ -303,19 +326,20 @@
 
   // 表单数据
   const formData = reactive({
-    id: undefined,
+    id: undefined as number | undefined,
     username: '',
     realName: '',
     password: '',
     confirmPassword: '',
     phone: '',
     email: '',
-    status: 1
+    status: 1,
+    roleIds: [] as number[]
   })
 
   // 重置密码表单数据
   const resetPasswordForm = reactive({
-    userId: undefined,
+    userId: undefined as number | undefined,
     newPassword: '',
     confirmPassword: ''
   })
@@ -347,7 +371,8 @@
       { required: true, message: '请输入电子邮箱', trigger: 'blur' },
       { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
     ],
-    status: [{ required: true, message: '请选择用户状态', trigger: 'change' }]
+    status: [{ required: true, message: '请选择用户状态', trigger: 'change' }],
+    roleIds: [{ required: true, type: 'array', message: '请选择用户角色', trigger: 'change' }]
   }
 
   // 重置密码表单验证规则
@@ -382,9 +407,17 @@
       }
 
       const response = await getUsersApi(params)
-      
-      userList.value = response.records
-      pagination.total = response.total
+      // 确保响应数据存在且格式正确
+      if (response && response.records) {
+        userList.value = response.records.map((user: any) => ({
+          ...user,
+          roleIds: user.roleIds || []
+        }))
+        pagination.total = response.total || 0
+      } else {
+        userList.value = []
+        pagination.total = 0
+      }
     } catch (error: any) {
       message.error('加载用户列表失败: ' + (error.message || '未知错误'))
     } finally {
@@ -419,15 +452,36 @@
     isEdit.value = false
     modalVisible.value = true
     resetForm()
+    // 确保表单字段被重置
+    setTimeout(() => {
+      formRef.value?.resetFields()
+    }, 0)
   }
 
   // 编辑
-  const handleEdit = (record: User) => {
+  const handleEdit = async (record: User) => {
     isEdit.value = true
     modalVisible.value = true
-    Object.assign(formData, {
-      ...record
-    })
+    
+    // 获取完整的用户信息（包括角色）
+    try {
+      const response = await getUserByIdApi(record.id)
+      const userDetail = response.data || response
+      // 确保roleIds是一个数组
+      const roleIds = Array.isArray(userDetail.roleIds) ? userDetail.roleIds : []
+      Object.assign(formData, {
+        ...userDetail,
+        roleIds: roleIds
+      })
+    } catch (error: any) {
+      message.error('获取用户详情失败: ' + (error.message || '未知错误'))
+      // 如果获取详情失败，使用表格中的数据
+      const roleIds = Array.isArray(record.roleIds) ? record.roleIds : []
+      Object.assign(formData, {
+        ...record,
+        roleIds: roleIds
+      })
+    }
   }
 
   // 重置密码
@@ -494,7 +548,11 @@
       await formRef.value?.validate()
       saveLoading.value = true
 
-      const userData = { ...formData }
+      // 从用户数据中移除confirmPassword字段
+      const userData = {
+        ...formData
+      }
+      // @ts-ignore
       delete userData.confirmPassword
 
       if (isEdit.value) {
@@ -508,7 +566,11 @@
       modalVisible.value = false
       loadUserList()
     } catch (error: any) {
-      message.error('保存失败: ' + (error.message || '未知错误'))
+      if (error.message?.includes('用户名已存在')) {
+        message.error('用户名已被使用，请更换其他用户名')
+      } else {
+        message.error('保存失败: ' + (error.message || '未知错误'))
+      }
     } finally {
       saveLoading.value = false
     }
@@ -530,14 +592,29 @@
       confirmPassword: '',
       phone: '',
       email: '',
-      status: 1
+      status: 1,
+      roleIds: []
     })
     formRef.value?.resetFields()
+  }
+
+  // 加载角色列表
+  const loadRoleList = async () => {
+    try {
+      const response = await getAllRolesApi()
+      // 后端返回的数据结构是 { code, message, data: { records, total, size, current, pages }, timestamp, success }
+      // 我们需要从 data.records 中提取角色列表
+      const roles = response.data?.records || response.records || []
+      roleList.value = roles.filter((role: any) => role.status === 1)
+    } catch (error: any) {
+      message.error('加载角色列表失败: ' + (error.message || '未知错误'))
+    }
   }
 
   // 组件挂载
   onMounted(() => {
     loadUserList()
+    loadRoleList()
   })
 </script>
 

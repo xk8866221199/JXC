@@ -56,13 +56,21 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
             queryWrapper.eq("status", status);
         }
         
-        queryWrapper.orderByDesc("created_time");
+        queryWrapper.orderByDesc("created_at");
         return userMapper.selectPage(page, queryWrapper);
     }
     
     @Override
     public SysUser getUserById(Long id) {
-        return userMapper.selectById(id);
+        SysUser user = userMapper.selectById(id);
+        if (user != null) {
+            // 获取用户的角色ID列表
+            List<Long> roleIds = userRoleMapper.selectRoleIdsByUserId(id);
+            if (roleIds != null && !roleIds.isEmpty()) {
+                user.setRoleIds(roleIds.toArray(new Long[0]));
+            }
+        }
+        return user;
     }
     
     @Transactional(rollbackFor = Exception.class)
@@ -135,11 +143,13 @@ public class UserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impleme
     @Override
     public boolean deleteUser(Long id) {
         try {
-            // 逻辑删除用户
+            // 物理删除用户
             SysUser user = new SysUser();
             user.setId(id);
-            user.setDeleted(1);
-            int result = userMapper.updateById(user);
+            int result = userMapper.deleteUserPhysically(id);
+            
+            // 同时删除用户角色关联关系
+            userRoleMapper.deleteByUserId(id);
             
             logger.info("删除用户成功: ID={}", id);
             return result > 0;

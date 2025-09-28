@@ -219,27 +219,45 @@
 
       loginLoading.value = true
 
+      console.log('开始登录请求:', {
+        username: loginForm.username,
+        password: loginForm.password
+      })
+
       // 调用真实的登录API
       const response = await loginApi({
         username: loginForm.username,
         password: loginForm.password,
-        captcha: loginForm.captcha,
-        rememberMe: rememberMe.value
+        captcha: loginForm.captcha
       })
 
+      console.log('登录响应:', response)
+
+      // 确保响应数据存在
+      if (!response) {
+        throw new Error('登录响应为空')
+      }
+
+      // 检查必需的字段
+      if (!response.token) {
+        throw new Error('登录响应中缺少token')
+      }
+
       // 保存用户信息
-      userStore.setToken(response.token)
+      userStore.setToken(response.token || '')
       userStore.setUserInfo({
-        id: response.userId,
-        username: response.username,
-        name: response.realName,
-        avatar: response.avatar
+        id: response.userId || '',
+        username: response.username || '',
+        name: response.realName || '',
+        avatar: response.avatar || ''
       })
       userStore.setRoles(response.roles || [])
       userStore.setPermissions(response.permissions || [])
 
       // 保存token到localStorage
-      localStorage.setItem('token', response.token)
+      if (response.token) {
+        localStorage.setItem('token', response.token)
+      }
 
       // 记住登录
       if (rememberMe.value) {
@@ -255,6 +273,14 @@
       message.success('登录成功，欢迎回来！')
       router.push('/')
     } catch (error: any) {
+      console.error('登录失败:', error)
+      console.error('错误详情:', {
+        message: error.message,
+        response: error.response,
+        request: error.request
+      })
+      
+      // 增加失败次数
       failedAttempts.value++
 
       // 3次失败后显示验证码
@@ -263,11 +289,23 @@
         refreshCaptcha()
       }
 
+      // 处理不同类型的错误
+      let errorMessage = '登录失败，请稍后重试'
+      
       if (error.errorFields) {
-        message.error('请检查输入信息')
-      } else {
-        message.error(error.message || '登录失败，请稍后重试')
+        errorMessage = '请检查输入信息'
+      } else if (error.message) {
+        // 如果是后端返回的具体错误信息
+        errorMessage = error.message
+      } else if (error.response && error.response.data && error.response.data.message) {
+        // 如果是HTTP响应中的错误信息
+        errorMessage = error.response.data.message
+      } else if (error.request) {
+        // 网络错误
+        errorMessage = '网络连接失败，请检查网络设置'
       }
+
+      message.error(errorMessage)
     } finally {
       loginLoading.value = false
     }

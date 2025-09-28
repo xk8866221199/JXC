@@ -98,9 +98,11 @@ public class SecurityConfig {
                     "/public/**",
                     "/verify/**",
                     "/actuator/health",
+                    "/actuator/info",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
-                    "/swagger-ui.html"
+                    "/swagger-ui.html",
+                    "/doc.html"
                 ).permitAll()
                 
                 // 管理员接口

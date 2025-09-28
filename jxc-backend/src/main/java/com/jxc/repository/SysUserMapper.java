@@ -5,6 +5,7 @@ import com.jxc.entity.SysUser;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Delete;
 
 /**
  * 系统用户数据访问层
@@ -35,4 +36,13 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     @Select("SELECT COUNT(*) FROM sys_user WHERE username = #{username} AND deleted = 0 " +
             "AND (#{excludeId} IS NULL OR id != #{excludeId})")
     int countByUsername(@Param("username") String username, @Param("excludeId") Long excludeId);
+    
+    /**
+     * 物理删除用户
+     *
+     * @param id 用户ID
+     * @return 删除的记录数
+     */
+    @Delete("DELETE FROM sys_user WHERE id = #{id}")
+    int deleteUserPhysically(@Param("id") Long id);
 }

@@ -14,7 +14,7 @@
 - **日期处理**: Day.js 1.11.18
 - **代码规范**: ESLint + Prettier
 - **单元测试**: Vitest + @vue/test-utils
-- **部署**: Docker + Nginx
+- **部署**: Nginx
 
 ## 📁 项目结构
 
@@ -45,10 +45,7 @@ jxc-frontend/
 ├── .env.production        # 生产环境配置
 ├── .eslintrc.js          # ESLint配置
 ├── .prettierrc           # Prettier配置
-├── docker-compose.yml    # Docker Compose配置
-├── Dockerfile            # Docker镜像配置
 ├── nginx.conf            # Nginx配置
-├── deploy.sh             # 部署脚本
 ├── package.json          # 项目依赖
 ├── tsconfig.json         # TypeScript配置
 ├── vite.config.ts        # Vite配置
@@ -74,7 +71,7 @@ jxc-frontend/
 - **类型安全**: 完整的TypeScript类型定义
 - **代码规范**: ESLint + Prettier自动化代码检查
 - **单元测试**: 完整的测试覆盖
-- **部署便捷**: Docker容器化部署
+- **部署便捷**: Nginx部署
 
 ## 🛠️ 开发环境搭建
 
@@ -138,51 +135,6 @@ npm run type-check
 
 ## 🚀 部署指南
 
-### Docker部署（推荐）
-
-1. **构建镜像**
-```bash
-docker build -t jxc-frontend .
-```
-
-2. **运行容器**
-```bash
-docker run -p 3000:80 jxc-frontend
-```
-
-3. **使用Docker Compose**
-```bash
-# 启动所有服务
-docker-compose up -d
-
-# 仅启动前端服务
-docker-compose up -d jxc-frontend
-
-# 查看日志
-docker-compose logs -f jxc-frontend
-
-# 停止服务
-docker-compose down
-```
-
-### 一键部署
-
-项目提供了自动化部署脚本：
-
-```bash
-# 完整部署流程
-./deploy.sh
-
-# 仅构建项目
-./deploy.sh build
-
-# 仅启动服务
-./deploy.sh start
-
-# 查看帮助
-./deploy.sh --help
-```
-
 ### 手动部署
 
 1. **构建项目**
@@ -211,6 +163,24 @@ server {
 3. **启动服务**
 ```bash
 nginx -s reload
+```
+
+### 一键部署
+
+项目提供了自动化部署脚本：
+
+```bash
+# 完整部署流程
+./deploy.sh
+
+# 仅构建项目
+./deploy.sh build
+
+# 仅启动服务
+./deploy.sh start
+
+# 查看帮助
+./deploy.sh --help
 ```
 
 ## 🔧 配置说明
@@ -311,7 +281,7 @@ export const useExampleStore = defineStore('example', () => {
 - ✅ 集成ECharts 5.6.0数据可视化
 - ✅ 配置完整的代码规范和格式化
 - ✅ 配置Vitest单元测试环境
-- ✅ 完成Docker容器化部署配置
+- ✅ 完成Nginx部署配置
 - ✅ 完成所有业务页面基础结构
 - ✅ 完成登录页面和仪表盘功能
 - ✅ 完成主布局和导航系统

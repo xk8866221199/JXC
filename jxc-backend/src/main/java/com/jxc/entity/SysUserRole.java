@@ -28,9 +28,13 @@ public class SysUserRole {
     @Schema(description = "角色ID")
     private Long roleId;
     
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    @TableField("created_by")
+    @Schema(description = "创建人")
+    private Long createdBy;
+    
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     @Schema(description = "创建时间")
-    private LocalDateTime createdTime;
+    private LocalDateTime createdAt;
     
     // 构造函数
     public SysUserRole() {}
@@ -65,12 +69,20 @@ public class SysUserRole {
         this.roleId = roleId;
     }
     
-    public LocalDateTime getCreatedTime() {
-        return createdTime;
+    public Long getCreatedBy() {
+        return createdBy;
     }
     
-    public void setCreatedTime(LocalDateTime createdTime) {
-        this.createdTime = createdTime;
+    public void setCreatedBy(Long createdBy) {
+        this.createdBy = createdBy;
+    }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+    
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
     
     @Override
@@ -79,7 +91,8 @@ public class SysUserRole {
                 "id=" + id +
                 ", userId=" + userId +
                 ", roleId=" + roleId +
-                ", createdTime=" + createdTime +
+                ", createdBy=" + createdBy +
+                ", createdAt=" + createdAt +
                 '}';
     }
 }

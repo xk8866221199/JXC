@@ -86,54 +86,82 @@ CREATE TABLE sys_role_permission (
 -- ======================================
 
 -- 商品分类表
-DROP TABLE IF EXISTS goods_category;
-CREATE TABLE goods_category (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '分类ID',
-    category_name VARCHAR(50) NOT NULL COMMENT '分类名称',
-    category_code VARCHAR(50) NOT NULL UNIQUE COMMENT '分类编码',
-    parent_id BIGINT DEFAULT 0 COMMENT '父分类ID',
-    level TINYINT DEFAULT 1 COMMENT '分类层级',
-    sort_order INT DEFAULT 0 COMMENT '排序',
-    status TINYINT DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
-    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除'
+DROP TABLE IF EXISTS product_category;
+CREATE TABLE product_category (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '分类ID',
+    parent_id BIGINT NOT NULL DEFAULT '0' COMMENT '父分类ID',
+    category_name VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类名称',
+    category_code VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类编码',
+    description VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '分类描述',
+    icon VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '分类图标',
+    sort_order INT NOT NULL DEFAULT '1' COMMENT '排序',
+    status TINYINT NOT NULL DEFAULT '1' COMMENT '状态(0:禁用,1:启用)',
+    remark VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+    created_by BIGINT DEFAULT NULL COMMENT '创建人',
+    updated_by BIGINT DEFAULT NULL COMMENT '更新人',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT NOT NULL DEFAULT '0' COMMENT '删除标志(0:未删除,1:已删除)'
+,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_category_code (category_code),
+    KEY idx_parent_id (parent_id),
+    KEY idx_status (status),
+    KEY idx_sort_order (sort_order)
 ) ENGINE=InnoDB COMMENT='商品分类表';
 
 -- 商品信息表
-DROP TABLE IF EXISTS goods_info;
-CREATE TABLE goods_info (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '商品ID',
-    goods_name VARCHAR(100) NOT NULL COMMENT '商品名称',
-    goods_code VARCHAR(50) NOT NULL UNIQUE COMMENT '商品编码',
-    barcode VARCHAR(50) COMMENT '商品条码',
+DROP TABLE IF EXISTS product;
+CREATE TABLE product (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '商品ID',
+    product_code VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品编码',
+    product_name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品名称',
     category_id BIGINT NOT NULL COMMENT '分类ID',
-    supplier_id BIGINT COMMENT '供应商ID',
-    brand VARCHAR(50) COMMENT '品牌',
-    unit VARCHAR(20) NOT NULL DEFAULT '个' COMMENT '计量单位',
-    purchase_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '进货价',
-    sale_price DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '销售价',
-    min_stock INT DEFAULT 0 COMMENT '最低库存',
-    description TEXT COMMENT '商品描述',
-    status TINYINT DEFAULT 1 COMMENT '状态：0-下架 1-上架',
-    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
-    INDEX idx_goods_code (goods_code),
-    INDEX idx_category_id (category_id)
+    brand VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '品牌',
+    unit VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '单位',
+    specification VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '规格型号',
+    description TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT '商品描述',
+    image_url VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商品图片',
+    purchase_price DECIMAL(10,2) NOT NULL DEFAULT '0.00' COMMENT '采购价格',
+    sale_price DECIMAL(10,2) NOT NULL DEFAULT '0.00' COMMENT '销售价格',
+    stock_quantity INT NOT NULL DEFAULT '0' COMMENT '库存数量',
+    min_stock INT NOT NULL DEFAULT '0' COMMENT '最小库存',
+    max_stock INT NOT NULL DEFAULT '0' COMMENT '最大库存',
+    status TINYINT NOT NULL DEFAULT '1' COMMENT '状态(0:禁用,1:启用)',
+    remark VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+    created_by BIGINT DEFAULT NULL COMMENT '创建人',
+    updated_by BIGINT DEFAULT NULL COMMENT '更新人',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT NOT NULL DEFAULT '0' COMMENT '删除标志(0:未删除,1:已删除)',
+    UNIQUE KEY uk_product_code (product_code),
+    KEY idx_category_id (category_id),
+    KEY idx_status (status),
+    KEY idx_stock_quantity (stock_quantity)
 ) ENGINE=InnoDB COMMENT='商品信息表';
 
 -- 供应商信息表
-DROP TABLE IF EXISTS supplier_info;
-CREATE TABLE supplier_info (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '供应商ID',
-    supplier_name VARCHAR(100) NOT NULL COMMENT '供应商名称',
-    supplier_code VARCHAR(50) NOT NULL UNIQUE COMMENT '供应商编码',
-    contact_person VARCHAR(50) COMMENT '联系人',
-    contact_phone VARCHAR(20) COMMENT '联系电话',
-    address VARCHAR(200) COMMENT '地址',
-    status TINYINT DEFAULT 1 COMMENT '状态：0-禁用 1-启用',
-    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除'
+DROP TABLE IF EXISTS supplier;
+CREATE TABLE supplier (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '供应商ID',
+    supplier_code VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '供应商编码',
+    supplier_name VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '供应商名称',
+    contact_person VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '联系人',
+    contact_phone VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '联系电话',
+    contact_email VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '联系邮箱',
+    address VARCHAR(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '地址',
+    credit_level TINYINT NOT NULL DEFAULT '1' COMMENT '信用等级(1:A级,2:B级,3:C级)',
+    payment_terms VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '付款条件',
+    status TINYINT NOT NULL DEFAULT '1' COMMENT '状态(0:禁用,1:启用)',
+    remark VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
+    created_by BIGINT DEFAULT NULL COMMENT '创建人',
+    updated_by BIGINT DEFAULT NULL COMMENT '更新人',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted TINYINT NOT NULL DEFAULT '0' COMMENT '删除标志(0:未删除,1:已删除)'
+,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_supplier_code (supplier_code),
+    KEY idx_supplier_name (supplier_name),
+    KEY idx_status (status)
 ) ENGINE=InnoDB COMMENT='供应商信息表';

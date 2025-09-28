@@ -25,22 +25,38 @@ spring:
         max-active: 10
         max-idle: 5
         min-idle: 0
-  
-  # MyBatis Plus配置
-  mybatis-plus:
-    configuration:
-      map-underscore-to-camel-case: true
-      cache-enabled: false
-      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-    global-config:
-      db-config:
-        id-type: auto
-        logic-delete-field: deleted
-        logic-delete-value: 1
-        logic-not-delete-value: 0
-    mapper-locations: classpath*:mapper/**/*.xml
-    type-aliases-package: com.jxc.entity
-  
+      client-options:
+        disconnected-behavior: reject
+        auto-reconnect: true
+
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.jxc.entity
+
+# 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      enabled: true
+    info:
+      enabled: true
+
 # 开发环境日志级别
 logging:
   level:

@@ -14,6 +14,7 @@
           placeholder="搜索分类名称"
           style="width: 300px"
           @search="handleSearch"
+          @change="handleSearchChange"
           allowClear
         />
         <a-space>
@@ -83,7 +84,6 @@
                   type="link"
                   size="small"
                   danger
-                  :disabled="record.children && record.children.length > 0"
                 >
                   <DeleteOutlined />
                   删除
@@ -118,22 +118,22 @@
 
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="分类名称" name="name">
-              <a-input v-model:value="formData.name" placeholder="请输入分类名称" />
+            <a-form-item label="分类名称" name="categoryName">
+              <a-input v-model:value="formData.categoryName" placeholder="请输入分类名称" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="分类编码" name="code">
-              <a-input v-model:value="formData.code" placeholder="请输入分类编码" />
+            <a-form-item label="分类编码" name="categoryCode">
+              <a-input v-model:value="formData.categoryCode" placeholder="请输入分类编码" />
             </a-form-item>
           </a-col>
         </a-row>
 
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="排序" name="sort">
+            <a-form-item label="排序" name="sortOrder">
               <a-input-number
-                v-model:value="formData.sort"
+                v-model:value="formData.sortOrder"
                 :min="0"
                 style="width: 100%"
                 placeholder="数字越小排序越靠前"
@@ -170,6 +170,14 @@
     NodeCollapseOutlined
   } from '@ant-design/icons-vue'
   import type { FormInstance } from 'ant-design-vue'
+  import {
+    getGoodsCategoriesApi,
+    getAllGoodsCategoriesApi,
+    createGoodsCategoryApi,
+    updateGoodsCategoryApi,
+    deleteGoodsCategoryApi,
+    updateGoodsCategoryStatusApi
+  } from '@/api/goodsCategory'
 
   // 接口类型定义
   interface CategoryItem {
@@ -248,37 +256,46 @@
   // 表单数据
   const formData = reactive({
     id: undefined as number | undefined,
-    name: '',
-    code: '',
+    categoryName: '',
+    categoryCode: '',
     parentId: undefined as number | undefined,
-    sort: 0,
+    sortOrder: 0,
     status: 'active' as 'active' | 'inactive',
     description: ''
   })
 
   // 表单验证规则
   const formRules = {
-    name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
-    code: [{ required: true, message: '请输入分类编码', trigger: 'blur' }],
+    categoryName: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
+    categoryCode: [{ required: true, message: '请输入分类编码', trigger: 'blur' }],
     status: [{ required: true, message: '请选择状态', trigger: 'change' }]
   }
 
   // 构建树形结构
   const buildTree = (list: CategoryItem[], parentId: number | null = null): CategoryItem[] => {
-    return list
-      .filter(item => item.parentId === parentId)
+    console.log('构建树形结构，输入列表长度:', list.length, '父ID:', parentId)
+    // 处理parentId为0的情况（表示顶级分类）
+    const targetParentId = parentId === null ? 0 : parentId;
+    const result = list
+      .filter(item => item.parentId === targetParentId)
       .map(item => ({
         ...item,
         children: buildTree(list, item.id)
       }))
       .sort((a, b) => a.sort - b.sort)
+    console.log('构建的子树，父ID:', targetParentId, '结果数量:', result.length)
+    return result
   }
 
   // 过滤树形数据
   const filterTree = (tree: CategoryItem[], keyword: string): CategoryItem[] => {
-    if (!keyword) return tree
+    console.log('过滤树形数据，树:', tree, '关键词:', keyword)
+    if (!keyword) {
+      console.log('无关键词，返回原始树')
+      return tree
+    }
 
-    return tree.reduce((acc: CategoryItem[], item) => {
+    const result = tree.reduce((acc: CategoryItem[], item) => {
       const matchesName = item.name.toLowerCase().includes(keyword.toLowerCase())
       const filteredChildren = filterTree(item.children || [], keyword)
 
@@ -291,12 +308,19 @@
 
       return acc
     }, [])
+    
+    console.log('过滤后的结果:', result)
+    return result
   }
 
   // 计算属性：分类树
   const categoryTree = computed(() => {
+    console.log('计算categoryTree，categoryList:', categoryList.value)
     const tree = buildTree(categoryList.value)
-    return filterTree(tree, searchKeyword.value)
+    console.log('构建的树结构:', tree)
+    const filteredTree = filterTree(tree, searchKeyword.value)
+    console.log('过滤后的树结构:', filteredTree)
+    return filteredTree
   })
 
   // 计算属性：分类选择树（用于表单中的上级分类选择）
@@ -318,6 +342,20 @@
     // 搜索时展开所有匹配的节点
     if (searchKeyword.value) {
       expandAllMatched()
+      loadCategories(searchKeyword.value)
+    } else {
+      // 如果搜索框为空，收起所有节点并重新加载数据
+      collapseAll()
+      loadCategories()
+    }
+  }
+
+  // 处理搜索框内容变化
+  const handleSearchChange = (e: any) => {
+    // 如果搜索框变为空，重新加载所有数据
+    if (!e.target.value) {
+      collapseAll()
+      loadCategories()
     }
   }
 
@@ -368,80 +406,44 @@
   }
 
   // 加载分类列表
-  const loadCategories = async () => {
+  const loadCategories = async (keyword?: string) => {
+    console.log('开始加载分类数据，关键词:', keyword)
     loading.value = true
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      const mockData: CategoryItem[] = [
-        {
-          id: 1,
-          name: '电子产品',
-          code: 'ELECTRONICS',
-          parentId: null,
-          level: 1,
-          sort: 1,
-          status: 'active',
-          description: '各类电子产品',
-          goodsCount: 15,
-          createTime: '2024-01-10 09:00:00'
-        },
-        {
-          id: 2,
-          name: '手机',
-          code: 'PHONE',
-          parentId: 1,
-          level: 2,
-          sort: 1,
-          status: 'active',
-          description: '智能手机',
-          goodsCount: 8,
-          createTime: '2024-01-10 09:15:00'
-        },
-        {
-          id: 3,
-          name: '电脑',
-          code: 'COMPUTER',
-          parentId: 1,
-          level: 2,
-          sort: 2,
-          status: 'active',
-          description: '台式机和笔记本',
-          goodsCount: 7,
-          createTime: '2024-01-10 09:30:00'
-        },
-        {
-          id: 4,
-          name: '服装鞋帽',
-          code: 'CLOTHING',
-          parentId: null,
-          level: 1,
-          sort: 2,
-          status: 'active',
-          description: '各类服装鞋帽',
-          goodsCount: 25,
-          createTime: '2024-01-10 10:00:00'
-        },
-        {
-          id: 5,
-          name: '男装',
-          code: 'MEN_CLOTHING',
-          parentId: 4,
-          level: 2,
-          sort: 1,
-          status: 'active',
-          description: '男士服装',
-          goodsCount: 12,
-          createTime: '2024-01-10 10:15:00'
-        }
-      ]
-
-      categoryList.value = mockData
-    } catch (error) {
-      message.error('加载分类列表失败')
+      const params: any = {
+        page: 1,
+        size: 1000 // 获取所有分类
+      }
+      
+      // 如果提供了搜索关键词，则添加到参数中
+      if (keyword) {
+        params.keyword = keyword
+      }
+      
+      console.log('发送请求参数:', params)
+      const response = await getGoodsCategoriesApi(params)
+      console.log('收到完整响应:', response)
+      
+      // 正确处理API响应数据结构（响应拦截器已经提取了data字段）
+      const categories = response.records || []
+      console.log('从响应中提取的分类数据:', categories)
+      
+      categoryList.value = categories.map((item: any) => ({
+        ...item,
+        name: item.categoryName, // 映射 categoryName 到 name
+        code: item.categoryCode, // 映射 categoryCode 到 code
+        status: item.status === 1 ? 'active' : 'inactive',
+        createTime: item.createdAt || item.createTime
+      }))
+      
+      console.log('处理后的分类数据:', categoryList.value)
+      console.log('categoryList.value长度:', categoryList.value.length)
+    } catch (error: any) {
+      message.error('加载分类列表失败: ' + (error.message || '未知错误'))
+      console.error('加载分类列表失败:', error)
     } finally {
       loading.value = false
+      console.log('数据加载完成，loading状态:', loading.value)
     }
   }
 
@@ -473,11 +475,28 @@
   // 删除
   const handleDelete = async (id: number) => {
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      message.success('删除成功')
-      loadCategories()
-    } catch (error) {
-      message.error('删除失败')
+      console.log('开始删除分类，ID:', id)
+      const response = await deleteGoodsCategoryApi(id)
+      console.log('删除响应:', response)
+      if (response.code === 200) {
+        if (response.data === true) {
+          message.success('删除成功')
+          loadCategories()
+        } else {
+          // 显示更详细的错误信息
+          const errorMsg = response.message || '删除失败'
+          message.error(`删除失败: ${errorMsg}`)
+          console.error('删除失败详情:', response)
+        }
+      } else {
+        const errorMsg = response.message || '未知错误'
+        message.error(`删除失败: ${errorMsg}`)
+        console.error('删除失败详情:', response)
+      }
+    } catch (error: any) {
+      console.error('删除失败:', error)
+      const errorMsg = error.message || error.toString() || '未知错误'
+      message.error(`删除失败: ${errorMsg}`)
     }
   }
 
@@ -487,13 +506,34 @@
       await formRef.value?.validate()
       saveLoading.value = true
 
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // 转换状态值
+      const submitData: any = {
+        ...formData,
+        status: formData.status === 'active' ? 1 : 0
+      }
 
-      message.success(isEdit.value ? '更新成功' : '添加成功')
+      // 如果是编辑模式但没有提供分类名称或编码，则使用原来的值
+      if (isEdit.value) {
+        submitData.categoryName = formData.categoryName || undefined;
+        submitData.categoryCode = formData.categoryCode || undefined;
+      }
+
+      if (isEdit.value) {
+        await updateGoodsCategoryApi(formData.id!, submitData)
+        message.success('更新成功')
+      } else {
+        await createGoodsCategoryApi(submitData)
+        message.success('添加成功')
+      }
+
       modalVisible.value = false
       loadCategories()
-    } catch (error) {
-      console.log('表单验证失败:', error)
+    } catch (error: any) {
+      if (error.message?.includes('分类编码已存在')) {
+        message.error('分类编码已存在，请更换其他编码')
+      } else {
+        message.error('保存失败: ' + (error.message || '未知错误'))
+      }
     } finally {
       saveLoading.value = false
     }
@@ -521,6 +561,7 @@
 
   // 组件挂载
   onMounted(() => {
+    console.log('商品分类组件已挂载，开始加载数据...')
     loadCategories()
   })
 </script>

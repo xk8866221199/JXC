@@ -22,8 +22,8 @@ public class JxcBackendApplication {
             ========================================
             🚀 JXC进销存管理系统启动成功！
             📝 项目文档: README.md
-            🌐 接口文档: http://localhost:8080/doc.html
-            📊 监控中心: http://localhost:8080/actuator
+            🌐 接口文档: http://localhost:8080/api/doc.html
+            📊 监控中心: http://localhost:8080/api/actuator
             ========================================
             """);
     }
